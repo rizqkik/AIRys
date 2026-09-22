@@ -32,10 +32,11 @@ class AIRysUI:
         self.root.configure(bg=self.BG)
         self.root.resizable(False, False)
         self.root.geometry(f"{width}x{height}")
-        self.root.attributes('-topmost', True)
-        # Position: top-right corner
+        self.root.attributes('-topmost', False)
+        # Position: center of screen
         screen_w = self.root.winfo_screenwidth()
-        self.root.geometry(f"{width}x{height}+{screen_w - width - 20}+20")
+        screen_h = self.root.winfo_screenheight()
+        self.root.geometry(f"{width}x{height}+{(screen_w - width) // 2}+{(screen_h - height) // 2}")
 
         # Animation state
         self.frame_count = 0
