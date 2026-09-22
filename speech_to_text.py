@@ -140,7 +140,7 @@ def transcribe():
         result = whisper_model.transcribe(
             tmp_path,
             language="id",
-            initial_prompt="Airis, tolong buka Chrome, Spotify, Outlook, WhatsApp, Excel, Word, Notepad"
+            initial_prompt="AIRys, tolong buka Chrome, Spotify, Outlook, WhatsApp, Excel, Word, Notepad"
         )
         text = result["text"].strip()
 
