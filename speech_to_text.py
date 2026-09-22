@@ -18,6 +18,21 @@ MAX_DURATION = 8.0
 MIN_RECORD_DURATION = 0.3
 BLOCK_SIZE = 1024
 
+# Track audio level and confidence for UI
+_last_audio_level = 0.0
+_last_confidence = 0.0
+
+
+def get_last_audio_level():
+    """Return last RMS audio level (0.0-1.0)."""
+    return _last_audio_level
+
+
+def get_last_confidence():
+    """Return last transcription confidence (0.0-1.0)."""
+    return _last_confidence
+
+
 def load_model():
     """Lazy load the whisper model."""
     global model
@@ -40,18 +55,13 @@ def get_default_input_device():
 def record_audio(sample_rate=SAMPLE_RATE):
     """
     Record audio from microphone until silence or max duration.
-    
-    Args:
-        sample_rate: Audio sample rate
-    
-    Returns:
-        Tuple of (audio_data, sample_rate) or (None, sample_rate) if timeout
+    Tracks RMS audio level for UI visualization.
     """
-    global DEVICE_ID
-    
+    global DEVICE_ID, _last_audio_level
+
     if DEVICE_ID is None:
         DEVICE_ID = get_default_input_device()
-    
+
     print("Mendengarkan perintah...")
     frames = []
     started = False
@@ -63,6 +73,10 @@ def record_audio(sample_rate=SAMPLE_RATE):
         nonlocal started, speech_started_at, last_voice_at
         now = time.time()
         volume = float(np.sqrt(np.mean((indata.astype(np.float32) / 32768.0) ** 2)))
+
+        # Track audio level for UI (thread-safe via module-level)
+        global _last_audio_level
+        _last_audio_level = min(1.0, volume * 15.0)  # Scale up for visibility
 
         if volume > SPEECH_THRESHOLD:
             if not started:
@@ -110,17 +124,17 @@ def record_audio(sample_rate=SAMPLE_RATE):
 def transcribe():
     """
     Transcribe audio from microphone to text.
-    
-    Returns:
-        Transcribed text string
+    Tracks confidence from Whisper output for UI visualization.
     """
+    global _last_confidence
     audio, sr = record_audio()
     if audio is None or len(audio) == 0:
+        _last_confidence = 0.0
         return ""
 
     tmp_path = tempfile.mktemp(suffix=".wav")
     wav.write(tmp_path, sr, audio)
-    
+
     try:
         whisper_model = load_model()
         result = whisper_model.transcribe(
@@ -128,9 +142,22 @@ def transcribe():
             language="id",
             initial_prompt="Airis, tolong buka Chrome, Spotify, Outlook, WhatsApp, Excel, Word, Notepad"
         )
-        return result["text"].strip()
+        text = result["text"].strip()
+
+        # Get confidence from segments if available
+        segments = result.get("segments", [])
+        if segments:
+            # Average no_speech_prob as inverse of confidence
+            no_speech_probs = [s.get("no_speech_prob", 1.0) for s in segments]
+            avg_no_speech = sum(no_speech_probs) / len(no_speech_probs)
+            _last_confidence = max(0.0, min(1.0, 1.0 - avg_no_speech))
+        else:
+            _last_confidence = 0.5 if text else 0.0
+
+        return text
     except Exception as e:
         print(f"Transcription error: {e}")
+        _last_confidence = 0.0
         return ""
     finally:
         try:
@@ -143,3 +170,5 @@ if __name__ == "__main__":
     print("Bicara sekarang...")
     teks = transcribe()
     print(f"Kamu bilang: {teks}")
+    print(f"Audio level: {_last_audio_level:.2f}")
+    print(f"Confidence: {_last_confidence:.2f}")

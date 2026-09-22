@@ -4,7 +4,7 @@ import queue
 import webbrowser
 import re
 from clap_detector import listen_for_claps
-from speech_to_text import transcribe
+from speech_to_text import transcribe, get_last_audio_level, get_last_confidence
 from tts import bicara, set_visualizer_callback
 from brain import proses_perintah
 from executor import buka_aplikasi
@@ -77,10 +77,20 @@ def speak_and_show(message):
     ui_queue.put({'type': 'status', 'status': 'listening'})
 
 
+def ui_update_loop():
+    """Continuously update UI with audio levels and confidence."""
+    while True:
+        # Update mic level (always, but decays when not listening)
+        ui.update_mic_level(get_last_audio_level())
+        # Update voice confidence
+        ui.set_voice_confidence(get_last_confidence())
+        time.sleep(0.05)  # 20fps update
+
+
 def main_loop():
-    global aktif
+    global aktif, ui
     ui = init_ui()
-    set_visualizer_callback(ui.update_visualizer)
+    set_visualizer_callback(ui.update_airys_level)
     ui.tambah_pesan("system", "— sistem dimulai —")
     ui.set_status("standby")
 
@@ -97,6 +107,10 @@ def main_loop():
         ui.root.after(100, process_ui_updates)
 
     ui.root.after(100, process_ui_updates)
+
+    # Start UI update loop for audio levels
+    ui_thread = threading.Thread(target=ui_update_loop, daemon=True)
+    ui_thread.start()
 
     def voice_loop():
         global aktif
@@ -140,7 +154,9 @@ def main_loop():
                 continue
 
             ui_queue.put({'type': 'status', 'status': 'thinking'})
+            ui.start_processing()
             hasil = proses_perintah(teks)
+            ui.stop_processing()
             ucapan = hasil.get("ucapan", "Siap.")
             aksi = hasil.get("aksi", "jawab_saja")
             target = hasil.get("target", "")
