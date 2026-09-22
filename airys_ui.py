@@ -364,6 +364,7 @@ class AIRysUI:
         self.wave_y = wave_y
         wave_w = 200
         wave_h = 40
+        self.wave_h = wave_h
         self.wave_points = 40
 
         # Background
@@ -532,7 +533,7 @@ class AIRysUI:
             y_off = (math.sin(phase) * 0.5 +
                      math.sin(phase * 1.7 + 1) * 0.3 +
                      math.sin(phase * 0.3 + 2) * 0.2)
-            y = self.wave_y + y_off * wave_h * wave_amp * 0.15
+            y = self.wave_y + y_off * self.wave_h * wave_amp * 0.15
             wave_coords.extend([x, y])
         if len(wave_coords) >= 4:
             self.canvas.coords(self.wave_line, *wave_coords)
